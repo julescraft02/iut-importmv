@@ -1,0 +1,56 @@
+#! /bin/bash
+#Démarage du script et définiton du chemin dans la variable CHEMIN.
+echo "🚀 - Démarage du script (0/5)"
+CHEMIN="/usr/local/virtual_machine/infoetu/${USER}/vbox_vms/"
+
+#Enregistrement et ping de la machine source.
+echo "1 - Enregistrement de la machine hôte et du dossier (1/5)"
+echo "--Veuillez rentrer le nom de la machine hôte ou est stocké la VM (exemple: bouleau11) :"
+read NOMMACHINE
+while ! ping -c 1 ${NOMMACHINE} | grep -q "icmp" ; do
+	echo "Machine hôte \"${NOMMACHINE}\" injoignable."
+	echo "--Veuillez entrer de nouveau une machine hôte :"
+	read NOMMACHINE
+done
+echo "2 - Vérificatin du chemin local (2/5)"
+#Récupération du nom de dossier.
+echo "Veuillez rentrer le nom de dossier de votre machine virtuelle (exemple: S0.03): "
+read NOMDOSSIER
+#Vérification ou réation du dossier de la VM sur la machine locale.
+if [ -d ${CHEMIN}${NOMDOSSIER} ] ; then
+	echo "Le dossier ${NOMDOSSIER} est déjà existant. Voulez-vous supprimer son contenu ? (yes / no) :"
+	read YESNO
+	while [[ ${YESNO} != "yes" && ${YESNO} != "no" ]] ; do
+		echo "Veuillez répondre par oui ou non :"
+		read YESNO
+	done
+	if [ ${YESNO} = "yes" ] ; then
+		rm -r -f "${CHEMIN}${NOMDOSSIER}"
+	else
+		mv -r "${CHEMIN}${NOMDOSSIER}" "${CHEMIN}${NOMDOSSIER}.backup"
+		echo "Votre dossier original est disponible sous ${CHEMIN}${NOMDOSSIER}.backup"
+	fi
+else
+	echo "Création du dossier local"
+	mkdir -p "${CHEMIN}${NOMDOSSIER}"
+fi
+#Utilisation d'un .bashrc qui permet la connexion sftp.
+echo "3 - Mise à jour du .bashrc pour aceuillir la connexion distante (3/5)"
+cp /home/infoetu/${USER}/.bashrc /home/infoetu/${USER}/.bashrc-backup
+echo '[[ $- == *i* ]] || return' >> /home/infoetu/${USER}/.bashrc
+
+#Copie des fichiers distants sur la machine locale.
+echo "4 - Récupération des fichier distants sur ${NOMMACHINE} (4/5)"
+rsync -avz --progress ${USER}@${NOMMACHINE}:${CHEMIN}${NOMDOSSIER} ${CHEMIN}
+echo "Récupératin compétée !"
+
+#Récupération du fichier .bashrc d'origine.
+echo "5 - Restauration du .bashrc (5/5)"
+cp ~/.bashrc-backup ~/.bashrc
+rm ~/.bashrc-backup
+
+#Sauvegarde nom de la machine actuelle pour une future récupération
+echo "$HOSTNAME" > "~/whereis.${NOMDOSSIER}"
+
+#Fin du script.
+echo "✅ - Script exécuté avec succès !"
